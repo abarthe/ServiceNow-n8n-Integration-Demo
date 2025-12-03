@@ -1,0 +1,90 @@
+{
+  "name": "HubSpot Lead to ServiceNow CSM Ticket",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-webhook",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300],
+      "notes": "Receives JSON payload from HubSpot/CRM"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"priority\"]}}",
+              "value2": "high"
+            }
+          ]
+        }
+      },
+      "name": "Check Priority",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "notes": "Filters only High Priority leads"
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "requestMethod": "POST",
+        "url": "https://dev12345.service-now.com/api/now/table/incident",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "short_description",
+              "value": "VIP Lead Issue: {{$json[\"body\"][\"message\"]}}"
+            },
+            {
+              "name": "urgency",
+              "value": "1"
+            },
+            {
+              "name": "caller_id",
+              "value": "={{$json[\"body\"][\"email\"]}}"
+            }
+          ]
+        }
+      },
+      "name": "Create SN Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [500, 200],
+      "notes": "POST request to ServiceNow REST API"
+    },
+    {
+      "parameters": {
+        "channel": "sales-alerts",
+        "text": "⚠️ New Critical Ticket Created for VIP Lead: {{$json[\"body\"][\"email\"]}}"
+      },
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [700, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{"node": "Check Priority", "type": "main", "index": 0}]
+      ]
+    },
+    "Check Priority": {
+      "main": [
+        [{"node": "Create SN Ticket", "type": "main", "index": 0}]
+      ]
+    },
+    "Create SN Ticket": {
+      "main": [
+        [{"node": "Slack Alert", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}
